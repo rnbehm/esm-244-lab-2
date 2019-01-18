@@ -1,0 +1,157 @@
+---
+title: "ESM 244 Lab 2"
+author: "Allison Horst"
+date: "December 9, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(MASS)
+library(ggrepel)
+library(RColorBrewer)
+library(factoextra)
+library(ggbiplot)
+library(shinythemes)
+```
+ if u want to override (set) a function manually throut an entire workspace you can assign the function name explicitly
+ 
+```{r}
+select <- dplyr::select
+```
+ 
+ 
+ #1. ordinal logistic regression for political party affiliation by ethnicity age and sex
+
+ 
+
+```{r, message = FALSE}
+
+pol_party <- read_csv("pol_party.csv") %>% 
+  clean_names() # janitor function for snake case
+
+pol_df <- pol_party %>% 
+  select(birth_year, gender, ethnicity, political_party) %>% 
+  filter(birth_year > 1900, political_party != "NA", political_party <= 7) %>% 
+  mutate(age = 2016 - birth_year)
+
+# For political party: 1 = very liberal, 4 = moderate, 7 = very conservative
+
+# Coerce to factors (including ordered factor for the ranking of political party)
+
+pol_df$political_party <- factor(pol_df$political_party, ordered = TRUE, levels = c("1","2","3","4","5","6","7")) # Check class and levels to ensure
+
+# Then update the gender and ethnicity variables to factors (unordered)
+
+pol_df$ethnicity <- factor(pol_df$ethnicity)
+pol_df$gender <- factor(pol_df$gender) 
+
+# Then we can run ordinal logistic regression, but we should do some visualization first.
+
+```
+
+- Exploratory visualization
+
+```{r, message = FALSE}
+
+counts_eth <- pol_df %>% 
+  group_by(ethnicity, political_party) %>% 
+  tally()
+
+counts_g <- pol_df %>% 
+  group_by(gender, political_party) %>% 
+  tally()
+
+# Exploratory graphs
+
+ggplot(pol_df, aes(x = age, y = political_party)) +
+  geom_point(alpha = 0.5, aes(color = ethnicity)) # no notable effect of age
+
+ggplot(pol_df, aes(x = political_party)) +
+  geom_histogram(aes(fill = ethnicity), stat = "count") +
+  scale_fill_brewer(palette = "YlGnBu") +
+  theme_light() +
+  theme(legend.position = "NA") +
+  facet_wrap(~ethnicity, scales = "free")
+```
+n is too small for groups
+```{r}
+pol_model <- polr(political_party ~ age + gender + ethnicity, data= pol_df)
+
+summary(pol_model)
+# hard to find p value cause t value so its not even good we dont care about it
+#logodds coeff of 0= no effect so close to zero is sooooooo teeny
+#male vs female: males more likely to be conservative (log odds of 0.31)
+#if n is so small for a group the log odds will have no meaning like for native american group
+
+exp(coef(pol_model))
+#1 = no change
+#age so close to 1 so barely any effect
+#baselevel= female and asian
+
+
+#THIS IS NOT PUBLISHABLE DATA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SO BIAS!!!! BAD BAD BAD SAMPLE SIZE IS TOO SMALL GO TO JAIL
+
+
+#once weve decided on a model we can use it to make predictions
+
+predictions <- predict(pol_model, type="probs")
+#can change type to display diff things like odds or logodds 
+df<- data.frame(pol_df, predictions)
+df
+
+#can look at a hypothetical individual ex white woman age 26
+```
+
+```{r}
+wb_10 <- read_csv("wb_10.csv") %>% 
+  select(-X1) %>% 
+  column_to_rownames('code')
+
+wb_pca <- prcomp(wb_10[3:8], scale=TRUE)
+
+summary(wb_pca)
+
+ggbiplot(wb_pca) +
+  geom_text_repel(label = rownames(wb_10), size = 2, segment.size = 0.2) +
+  theme_bw() 
+
+ggbiplot(wb_pca, groups = wb_10$region) +
+  geom_text_repel(label = rownames(wb_10), size = 2, segment.size = 0.2) +
+  theme_bw() 
+```
+
+#factoextra package was built to help visualize outcomes of ordination methods
+```{r}
+
+# Scree plot!
+fviz_screeplot(wb_pca)
+
+# Show contributions/quality of representation for different variables on the PCs:
+
+# Contributions of variables to PC1
+fviz_contrib(wb_pca, choice = "var", axes = 1, top = 6)
+# Contributions of variables to PC2
+fviz_contrib(wb_pca, choice = "var", axes = 2, top = 6)
+
+#biplot showing points and vectors
+
+fviz_pca_biplot(wb_pca,
+                col.var ="cos2",
+                label = "var",
+                repel= TRUE)
+#cos2= higher = better represented in biplot from first variable component
+```
+
+
+DAS SHINY APP!!!!  brackets and parentheses are EVERYTHING!!!
+```{r}
+
+```
+
+
